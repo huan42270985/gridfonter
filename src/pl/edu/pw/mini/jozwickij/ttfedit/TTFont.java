@@ -122,6 +122,108 @@ public class TTFont {
 		}
 	}
 	
+	public TTFont(String file,String file2, String mode) throws Exception
+	{
+		if (mode.length()<1)
+			mode = MODE_READ;
+		try {
+			ttf = new RandomAccessFile(filename=file, mode);
+			ttf2= new RandomAccessFile(filename2=file2, mode);
+			
+			readAllOffsets();
+			
+			dirEntry = new TTFDirEntry();
+			dirEntry2 = new TTFDirEntry();
+			
+			Debug.println("Processing file '"+filename+"' in mode '" + mode +"'",this);
+			Debug.println("Processing file '"+filename2+"' in mode '" + mode +"'",this);
+		}
+		catch (Exception e) { throw e; }		
+		
+		boolean done = false;
+		
+		for (int i=0; i<offsets.numTables; i++)	{
+			try {
+				done = dirEntry.processEntryIn(ttf,i,tables);				
+			}
+			catch (Exception e) {
+				throw e;				
+			}
+			
+			if (done) {
+				addTable( dirEntry.getLastTable() );
+			}
+			else {
+				Debug.println("Table "+dirEntry.getLastTag()+" needs to be processed later",this);
+				scheduleTable( dirEntry.getLastTable() );
+			}
+		}
+		
+		boolean done2 = false;
+		
+		for (int j=0; j<offsets2.numTables; j++) {
+			try {
+				done2 = dirEntry2.processEntryIn(ttf2,j,tables2); //table->TTFtables import
+			}
+			catch (Exception e) {
+				throw e;				
+			}
+			
+			if (done2) {
+				addTable2( dirEntry2.getLastTable() ); //import
+			}
+			else {
+				Debug.println("Table "+dirEntry2.getLastTag()+" needs to be processed later",this);
+				scheduleTable2( dirEntry2.getLastTable() ); //import
+			}
+		}
+		
+		for (int i=0; i<DefaultProperties.DEP_RETRY_COUNT; i++) {
+			if (schedTables.size()==0)
+				break;
+			
+			for (Entry<String,TTFTable> e : schedTables.entrySet()) {
+			
+				boolean is_done = false;
+				try {
+					is_done = e.getValue().reread(ttf,tables);					
+				}
+				catch (Exception ex) {
+					throw ex;
+				}
+				if (is_done) {
+					addTable( e.getValue() );
+					schedTables.remove(e.getKey());
+					i--;
+					break;
+				}
+				else {
+					Debug.printlnErr("Table "+e.getValue().getTableName()+" needs to be processed later (because of dependencies)",this);
+				}
+			}
+			
+			for (Entry<String,TTFTable> e2 : schedTables2.entrySet()) {
+				
+				boolean is_done2 = false;
+				try {
+					is_done2 = e2.getValue().reread(ttf2,tables2);		
+				}
+				catch (Exception ex) {
+					throw ex;
+				}
+				if (is_done2) {
+					addTable2( e2.getValue() );
+					schedTables2.remove(e2.getKey()); 
+					i--;
+					break;
+				}
+				else {
+					Debug.printlnErr("Table "+e2.getValue().getTableName()+" needs to be processed later (because of dependencies)",this);
+				}
+			}
+		}
+	}
+	
 	public TTFTable getTable(String name)  {
 		return tables.get(name);
 	}
