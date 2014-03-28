@@ -122,6 +122,7 @@ public class TTFont {
 		}
 	}
 	
+	//add 20140328
 	public TTFont(String file,String file2, String mode) throws Exception
 	{
 		if (mode.length()<1)
